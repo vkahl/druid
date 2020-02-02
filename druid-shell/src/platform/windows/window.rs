@@ -25,7 +25,7 @@ use std::rc::{Rc, Weak};
 use std::sync::{Arc, Mutex};
 
 use log::{debug, error, warn};
-use winapi::ctypes::{c_int, c_void};
+use winapi::ctypes::c_void;
 use winapi::shared::dxgi::*;
 use winapi::shared::dxgi1_2::*;
 use winapi::shared::dxgiformat::*;
@@ -37,6 +37,8 @@ use winapi::um::d2d1::*;
 use winapi::um::unknwnbase::*;
 use winapi::um::winnt::*;
 use winapi::um::winuser::*;
+
+use win_win::WindowProc;
 
 use piet_common::d2d::{D2DFactory, DeviceContext};
 use piet_common::dwrite::DwriteFactory;
@@ -127,6 +129,9 @@ enum IdleKind {
 
 /// This is the low level window state. All mutable contents are protected
 /// by interior mutability, so we can handle reentrant calls.
+///
+/// TODO: clean up this tangle of interior mutability. Almost certainly,
+/// some of these state objects can be consolidated.
 struct WindowState {
     hwnd: Cell<HWND>,
     dpi: Cell<f32>,
@@ -140,6 +145,9 @@ struct WindowState {
 }
 
 /// Generic handler trait for the winapi window procedure entry point.
+///
+/// TODO: this doesn't need to be a trait (it's been supplanted by the
+/// WindowProcedure trait in the win-win crate).
 trait WndProc {
     fn connect(&self, handle: &WindowHandle, state: WndState);
 
@@ -305,6 +313,22 @@ impl<'a> WinCtxOwner<'a> {
             handle: self.handle.deref(),
             text,
         }
+    }
+}
+
+// This is a newtype solely so we can implement a trait from an external crate.
+#[derive(Clone)]
+struct RcWindowState(Rc<WindowState>);
+
+impl WindowProc for RcWindowState {
+    fn window_proc(
+        &self,
+        hwnd: HWND,
+        msg: UINT,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> Option<LRESULT> {
+        self.0.wndproc.window_proc(hwnd, msg, wparam, lparam)
     }
 }
 
@@ -809,7 +833,6 @@ impl WindowBuilder {
             // Maybe separate registration in build api? Probably only need to
             // register once even for multiple window creation.
 
-            let class_name = super::util::CLASS_NAME.to_wide();
             let dwrite_factory = DwriteFactory::new().unwrap();
             let dw_clone = clone_dwrite(&dwrite_factory);
             let wndproc = MyWndProc {
@@ -826,10 +849,10 @@ impl WindowBuilder {
                 idle_queue: Default::default(),
                 timers: Arc::new(Mutex::new(TimerSlots::new(1))),
             };
-            let win = Rc::new(window);
+            let rc_window_state = RcWindowState(Rc::new(window));
             let handle = WindowHandle {
                 dwrite_factory: Some(dwrite_factory),
-                state: Rc::downgrade(&win),
+                state: Rc::downgrade(&rc_window_state.0),
             };
 
             // Simple scaling based on System Dpi (96 is equivalent to 100%)
@@ -841,7 +864,7 @@ impl WindowBuilder {
                 // Probably GetDeviceCaps(..., LOGPIXELSX) is the best to do pre-10
                 96.0
             };
-            win.dpi.set(dpi);
+            rc_window_state.0.dpi.set(dpi);
             let width = (self.size.width * (f64::from(dpi) / 96.0)) as i32;
             let height = (self.size.height * (f64::from(dpi) / 96.0)) as i32;
 
@@ -853,20 +876,14 @@ impl WindowBuilder {
             if self.present_strategy == PresentStrategy::Flip {
                 dwExStyle |= WS_EX_NOREDIRECTIONBITMAP;
             }
-            let hwnd = create_window(
-                dwExStyle,
-                class_name.as_ptr(),
-                self.title.to_wide().as_ptr(),
-                self.dwStyle,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                width,
-                height,
-                0 as HWND,
-                hmenu,
-                0 as HINSTANCE,
-                win.clone(),
-            );
+            let window_class = win_win::WindowClass::from_name(super::util::CLASS_NAME);
+            let hwnd = win_win::WindowBuilder::new(rc_window_state.clone(), &window_class)
+                .style(self.dwStyle)
+                .ex_style(dwExStyle)
+                .menu(hmenu)
+                .size(width, height)
+                .name(&self.title)
+                .build();
             if hwnd.is_null() {
                 return Err(Error::NullHwnd);
             }
@@ -876,7 +893,7 @@ impl WindowBuilder {
                 None
             });
 
-            win.hwnd.set(hwnd);
+            rc_window_state.0.hwnd.set(hwnd);
             let state = WndState {
                 handler: self.handler.unwrap(),
                 render_target: None,
@@ -885,8 +902,8 @@ impl WindowBuilder {
                 stashed_key_code: KeyCode::Unknown(0),
                 stashed_char: None,
             };
-            win.wndproc.connect(&handle, state);
-            mem::drop(win);
+            rc_window_state.0.wndproc.connect(&handle, state);
+            mem::drop(rc_window_state);
             Ok(handle)
         }
     }
@@ -996,74 +1013,6 @@ unsafe fn create_dcomp_state(
     } else {
         Ok(None)
     }
-}
-
-#[cfg(target_arch = "x86_64")]
-type WindowLongPtr = winapi::shared::basetsd::LONG_PTR;
-#[cfg(target_arch = "x86")]
-type WindowLongPtr = LONG;
-
-pub(crate) unsafe extern "system" fn win_proc_dispatch(
-    hwnd: HWND,
-    msg: UINT,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if msg == WM_CREATE {
-        let create_struct = &*(lparam as *const CREATESTRUCTW);
-        let wndproc_ptr = create_struct.lpCreateParams;
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, wndproc_ptr as WindowLongPtr);
-    }
-    let window_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const WindowState;
-    let result = {
-        if window_ptr.is_null() {
-            None
-        } else {
-            (*window_ptr).wndproc.window_proc(hwnd, msg, wparam, lparam)
-        }
-    };
-
-    if msg == WM_NCDESTROY && !window_ptr.is_null() {
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-        mem::drop(Rc::from_raw(window_ptr));
-    }
-
-    match result {
-        Some(lresult) => lresult,
-        None => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
-/// Create a window (same parameters as CreateWindowExW) with associated WndProc.
-#[allow(clippy::too_many_arguments)]
-unsafe fn create_window(
-    dwExStyle: DWORD,
-    lpClassName: LPCWSTR,
-    lpWindowName: LPCWSTR,
-    dwStyle: DWORD,
-    x: c_int,
-    y: c_int,
-    nWidth: c_int,
-    nHeight: c_int,
-    hWndParent: HWND,
-    hMenu: HMENU,
-    hInstance: HINSTANCE,
-    wndproc: Rc<WindowState>,
-) -> HWND {
-    CreateWindowExW(
-        dwExStyle,
-        lpClassName,
-        lpWindowName,
-        dwStyle,
-        x,
-        y,
-        nWidth,
-        nHeight,
-        hWndParent,
-        hMenu,
-        hInstance,
-        Rc::into_raw(wndproc) as LPVOID,
-    )
 }
 
 impl Cursor {

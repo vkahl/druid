@@ -15,15 +15,12 @@
 //! Windows implementation of features at the application scope.
 
 use winapi::shared::minwindef::HINSTANCE;
-use winapi::shared::ntdef::LPCWSTR;
-use winapi::shared::windef::HCURSOR;
 use winapi::um::shellscalingapi::PROCESS_SYSTEM_DPI_AWARE;
 use winapi::um::wingdi::CreateSolidBrush;
-use winapi::um::winuser::{LoadIconW, PostQuitMessage, RegisterClassW, IDI_APPLICATION, WNDCLASSW};
+use winapi::um::winuser::{LoadIconW, PostQuitMessage, IDI_APPLICATION};
 
 use super::clipboard::Clipboard;
-use super::util::{self, ToWide, CLASS_NAME, OPTIONAL_FUNCTIONS};
-use super::window::win_proc_dispatch;
+use super::util::{self, CLASS_NAME, OPTIONAL_FUNCTIONS};
 
 pub struct Application;
 
@@ -39,25 +36,13 @@ impl Application {
         }
 
         unsafe {
-            let class_name = CLASS_NAME.to_wide();
             let icon = LoadIconW(0 as HINSTANCE, IDI_APPLICATION);
             let brush = CreateSolidBrush(0xff_ff_ff);
-            let wnd = WNDCLASSW {
-                style: 0,
-                lpfnWndProc: Some(win_proc_dispatch),
-                cbClsExtra: 0,
-                cbWndExtra: 0,
-                hInstance: 0 as HINSTANCE,
-                hIcon: icon,
-                hCursor: 0 as HCURSOR,
-                hbrBackground: brush,
-                lpszMenuName: 0 as LPCWSTR,
-                lpszClassName: class_name.as_ptr(),
-            };
-            let class_atom = RegisterClassW(&wnd);
-            if class_atom == 0 {
-                panic!("Error registering class");
-            }
+            let _class_atom = win_win::WindowClass::builder(CLASS_NAME)
+                .icon(icon)
+                .background(brush)
+                .build()
+                .unwrap();
         }
     }
 
