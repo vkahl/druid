@@ -26,9 +26,25 @@ use crate::*;
 use harness::*;
 use helpers::*;
 
+/// The base directory where we will write images generated during tests.
+/// These are generated for the purposes of debugging and development,
+/// that is we don't actually use them as part of testing.
+const TEST_IMAGE_OUTPUT_DIR: &str = "../target/test_images";
+
+pub fn image_path_for_test(test_name: &str) -> std::path::PathBuf {
+    std::path::Path::new(TEST_IMAGE_OUTPUT_DIR)
+        .join(test_name)
+        .with_extension("png")
+}
+
 /// test that the first widget to request focus during an event gets it.
 #[test]
 fn propogate_hot() {
+    //eprintln!("file {}\nmodule {}", file!(), module_path!());
+    //for (key, val) in std::env::vars() {
+    //eprintln!("{}: {}", key, val);
+    //}
+    //panic!("ahh");
     let (button, pad, root, empty) = widget_id4();
 
     let root_rec = Recording::default();
@@ -119,6 +135,7 @@ fn propogate_hot() {
         assert!(root_rec.is_empty() && padding_rec.is_empty() && button_rec.is_empty());
     });
 }
+
 #[test]
 fn take_focus() {
     const TAKE_FOCUS: Selector = Selector::new("druid-tests.take-focus");

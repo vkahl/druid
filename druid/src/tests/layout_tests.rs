@@ -70,6 +70,7 @@ fn row_column() {
         assert_eq!(state3.layout_rect.origin(), Point::ZERO);
         let state5 = harness.get_state(id5);
         assert_eq!(state5.layout_rect.origin(), Point::new(0., 200.));
+        harness.paint_to_path(image_path_for_test("row_column"));
     })
 }
 
@@ -115,6 +116,7 @@ fn simple_paint_rect() {
         assert_eq!(state.layout_rect.size(), Size::new(120., 120.,));
         // paint size is modified by insets
         assert_eq!(state.paint_rect().size(), Size::new(120., 140.,));
+        harness.paint_to_path(image_path_for_test("simple_paint_rect"));
     })
 }
 
@@ -169,5 +171,6 @@ fn flex_paint_rect_overflow() {
         // is a uniform 20. inset.
         let expected_paint_rect = state.layout_rect + Insets::uniform(20.);
         assert_eq!(state.paint_rect().size(), expected_paint_rect.size());
+        harness.paint_to_path(image_path_for_test("flex_paint_rect_overflow"));
     })
 }

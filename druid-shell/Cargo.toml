@@ -16,7 +16,10 @@ use_gtk = ["gtk", "gtk-sys", "gio", "gdk", "gdk-sys", "glib", "glib-sys", "cairo
 default-target = "x86_64-pc-windows-msvc"
 
 [dependencies]
-piet-common = "0.0.9"
+#piet-common = "0.0.9"
+#piet-common = { path="../../fontville/piet/piet-common" }
+piet-common = { git="https://github.com/linebender/piet.git", rev="0575c93", features=["png"] }
+
 log = "0.4.8"
 lazy_static = "1.0"
 time = "0.2.4"

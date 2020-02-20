@@ -13,6 +13,9 @@
 // limitations under the License.
 
 //! Tools and infrastructure for testing widgets.
+
+use std::path::PathBuf;
+
 use crate::core::{BaseState, CommandQueue};
 use crate::piet::{BitmapTarget, Device, Piet};
 use crate::window::PendingWindow;
@@ -43,6 +46,7 @@ pub(crate) const DEFAULT_SIZE: Size = Size::new(400., 400.);
 pub struct Harness<'a, T> {
     piet: Piet<'a>,
     inner: Inner<T>,
+    path: Option<PathBuf>,
 }
 
 /// All of the state except for the `Piet` (render context). We need to pass
@@ -66,25 +70,42 @@ impl<T: Data> Harness<'_, T> {
     /// For lifetime reasons™, we cannot just make a harness. It's complicated.
     /// I tried my best.
     pub fn create(data: T, root: impl Widget<T> + 'static, mut f: impl FnMut(&mut Harness<T>)) {
+        std::fs::create_dir_all(super::TEST_IMAGE_OUTPUT_DIR)
+            .expect("failed to create image output directory");
         let mut device = Device::new().expect("harness failed to get device");
         let target = device.bitmap_target(400, 400, 2.).expect("bitmap_target");
         let mut target = TargetGuard(Some(target));
         let piet = target.0.as_mut().unwrap().render_context();
 
+        let mut env = theme::init();
+        env.set(Env::DEBUG_PAINT, true);
         let inner = Inner {
             data,
-            env: theme::init(),
+            env,
             window: PendingWindow::new(root, LocalizedString::new(""), None)
                 .into_window(WindowId::next(), Default::default()),
             cmds: Default::default(),
         };
 
-        let mut harness = Harness { piet, inner };
+        let mut harness = Harness {
+            piet,
+            inner,
+            path: None,
+        };
+
         f(&mut harness);
+        if let Some(path) = harness.path.take() {
+            target.0.take().unwrap().save_to_file(path).unwrap();
+        }
     }
 
     pub fn window(&self) -> &Window<T> {
         &self.inner.window
+    }
+
+    pub fn paint_to_path(&mut self, path: impl Into<PathBuf>) {
+        self.path = Some(path.into());
+        self.paint();
     }
 
     #[allow(dead_code)]
