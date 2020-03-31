@@ -433,7 +433,7 @@ impl<T: Data, W: Widget<T>> Widget<T> for Scroll<T, W> {
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         bc.debug_check("Scroll");
 
-        let child_bc = BoxConstraints::new(Size::ZERO, self.direction.max_size(bc));
+        let child_bc = BoxConstraints::new(bc.min(), self.direction.max_size(bc));
         let size = self.child.layout(ctx, &child_bc, data, env);
         log_size_warnings(size);
 
