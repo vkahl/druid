@@ -30,3 +30,7 @@ mod text_input;
 pub use self::text_input::{BasicTextInput, EditAction, MouseAction, TextInput};
 
 mod text_buffer;
+mod text_layout;
+
+pub use text_buffer::TextBuffer;
+pub use text_layout::TextLayout;
