@@ -9,7 +9,7 @@ You can find its changes [documented below](#060---2020-06-01).
 
 ### Added
 
-- Added ctrl/shift key support to textbox. ([#1063] by [@vkahl])
+- Added ctrl/shift key support to textbox. ([#1076] by [@vkahl])
 
 ### Changed
 
@@ -351,6 +351,7 @@ Last release without a changelog :(
 [#1054]: https://github.com/linebender/druid/pull/1054
 [#1058]: https://github.com/linebender/druid/pull/1058
 [#1062]: https://github.com/linebender/druid/pull/1062
+[#1076]: https://github.com/linebender/druid/pull/1076
 
 [Unreleased]: https://github.com/linebender/druid/compare/v0.6.0...master
 [0.6.0]: https://github.com/linebender/druid/compare/v0.5.0...v0.6.0
