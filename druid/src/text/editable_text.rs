@@ -121,8 +121,7 @@ impl EditableText for String {
         let mut offset = from;
         let mut passed_alphanumeric = false;
         for prev_grapheme in self.get(0..from)?.graphemes(true).rev() {
-            let is_alphanumeric = prev_grapheme.chars().next()?.is_alphanumeric();
-            if is_alphanumeric {
+            if prev_grapheme.chars().next()?.is_alphanumeric() {
                 passed_alphanumeric = true;
             } else if passed_alphanumeric {
                 return Some(offset);
@@ -136,8 +135,7 @@ impl EditableText for String {
         let mut offset = from;
         let mut passed_alphanumeric = false;
         for next_grapheme in self.get(from..)?.graphemes(true) {
-            let is_alphanumeric = next_grapheme.chars().next()?.is_alphanumeric();
-            if is_alphanumeric {
+            if next_grapheme.chars().next()?.is_alphanumeric() {
                 passed_alphanumeric = true;
             } else if passed_alphanumeric {
                 return Some(offset);

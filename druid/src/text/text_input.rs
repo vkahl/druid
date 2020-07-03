@@ -74,12 +74,18 @@ impl TextInput for BasicTextInput {
             k_e if (HotKey::new(SysMods::CmdShift, KbKey::ArrowRight)).matches(k_e) => {
                 EditAction::ModifySelection(Movement::RightWord)
             }
-            // Select to home (Shift+Home)
-            k_e if (HotKey::new(SysMods::Shift, KbKey::Home)).matches(k_e) => {
+            // Select to home (Shift+Home || Shift+ArrowUp || Shift+Ctrl+ArrowUp || Shift+Cmd+ArrowUp)
+            k_e if (HotKey::new(SysMods::Shift, KbKey::Home)).matches(k_e)
+                || (HotKey::new(SysMods::Shift, KbKey::ArrowUp)).matches(k_e)
+                || (HotKey::new(SysMods::CmdShift, KbKey::ArrowUp)).matches(k_e) =>
+            {
                 EditAction::ModifySelection(Movement::LeftOfLine)
             }
-            // Select to end (Shift+End)
-            k_e if (HotKey::new(SysMods::Shift, KbKey::End)).matches(k_e) => {
+            // Select to end (Shift+End || Shift+ArrowDown || Shift+Ctrl+ArrowDown || Shift+Cmd+ArrowDown)
+            k_e if (HotKey::new(SysMods::Shift, KbKey::End)).matches(k_e)
+                || (HotKey::new(SysMods::Shift, KbKey::ArrowDown)).matches(k_e)
+                || (HotKey::new(SysMods::CmdShift, KbKey::ArrowDown)).matches(k_e) =>
+            {
                 EditAction::ModifySelection(Movement::RightOfLine)
             }
             // Select left (Shift+ArrowLeft)
@@ -120,12 +126,16 @@ impl TextInput for BasicTextInput {
             k_e if (HotKey::new(None, KbKey::Backspace)).matches(k_e) => EditAction::Backspace,
             // Delete
             k_e if (HotKey::new(None, KbKey::Delete)).matches(k_e) => EditAction::Delete,
-            // Home
-            k_e if (HotKey::new(None, KbKey::Home)).matches(k_e) => {
+            // Move to home (Home || Ctrl+ArrowUp || Cmd+ArrowUp)
+            k_e if (HotKey::new(None, KbKey::Home)).matches(k_e)
+                || (HotKey::new(SysMods::Cmd, KbKey::ArrowUp)).matches(k_e) =>
+            {
                 EditAction::Move(Movement::LeftOfLine)
             }
-            // End
-            k_e if (HotKey::new(None, KbKey::End)).matches(k_e) => {
+            // Move to end (End || Ctrl+ArrowDown || Cmd+ArrowDown)
+            k_e if (HotKey::new(None, KbKey::End)).matches(k_e)
+                || (HotKey::new(SysMods::Cmd, KbKey::ArrowDown)).matches(k_e) =>
+            {
                 EditAction::Move(Movement::RightOfLine)
             }
             // Actual typing
